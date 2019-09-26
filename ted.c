@@ -22,10 +22,27 @@ void enableRawMode() {
 	/**
 	 *  Turn off ECHO. Causes typed keys to be printed in terminal. 
 	 *  Turn off Ctrl-C & Ctrl-Z signals (ISIG)
+	 *  Disable Ctrl-S and Ctrl-Q. Ctrl-S stops data transmission to terminal until you press Ctrl-Q.
+	 *
 	 * */
-	raw.c_lflag &= ~(ECHO |
-			ICANON |
-			ISIG
+
+	// Input Flags
+	raw.c_iflag &= ~(
+			ICRNL	|
+			IXON   
+			);
+	
+	// Output Flags
+	raw.c_oflag &= ~(
+			OPOST
+			);
+
+	// Local Flags
+	raw.c_lflag &= ~(
+			ECHO	|
+			ICANON  |
+			IEXTEN	|
+			ISIG	
 			); 	
 
 	// Set the modified attributes of terminal
@@ -38,9 +55,9 @@ int main() {
 	char c;
 	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
 		if (iscntrl(c)) { // check if c is a control char
-			printf("%d\n", c);
+			printf("%d\r\n", c);
 		} else {
-			printf("%d ('%c')\n", c, c);
+			printf("%d ('%c')\r\n", c, c);
 		}
 	}
 
