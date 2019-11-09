@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <termios.h>
@@ -6,14 +7,20 @@
 
 struct termios orig_termios; // Original Terminal attributes
 
+void die(const char* s) {
+	perror(s);
+	exit(1);
+}
+
 void disableRawMode() {
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1 )
+		die("tcsetattr");
 }
 
 void enableRawMode() {
 	
 	// Get the current attributes of terminal
-	tcgetattr(STDIN_FILENO, &orig_termios);
+	if (tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
 	atexit(disableRawMode);
 
 	// Modify the current terminal attributes
@@ -53,20 +60,42 @@ void enableRawMode() {
 			ISIG	
 			); 	
 
+	/**
+	 * VMIN and VTIME are indexes into c_cc field which stands for "control characters", an array of bytes that
+	 * control various terminal settings.
+	 * VMIN - sets the minimum num of bytes of input needed before read() can return.
+	 * VTIME - sets the maximum amount of time to wait before read() returns. It is in tenths of a second, 
+	 * 	   so we set it to 1/10 of a second or 100 milliseconds.
+	 * */
+	raw.c_cc[VMIN] = 0;
+	raw.c_cc[VTIME] = 1;
+
 	// Set the modified attributes of terminal
-	tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
 int main() {
 	enableRawMode();
 
-	char c;
+	/**
 	while (read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
 		if (iscntrl(c)) { // check if c is a control char
 			printf("%d\r\n", c);
 		} else {
 			printf("%d ('%c')\r\n", c, c);
 		}
+	}
+	*/
+
+	while (1) {
+		char c = '\0';
+		if (read(STDIN_FILENO, &c, 1) == -1 && errno != EAGAIN) die("read");
+		if (iscntrl(c)) {
+			printf("%d\r\n", c);
+		} else {
+			printf("%d ('%c')\r\n", c, c);
+		}
+		if (c == 'q') break;
 	}
 
 	return 0;
